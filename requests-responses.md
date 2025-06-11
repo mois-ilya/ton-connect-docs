@@ -86,11 +86,12 @@ type DeviceInfo = {
   appVersion:  string; // e.g. "2.3.367"
   maxProtocolVersion: number;
   features: Feature[]; // list of supported features and methods in RPC
-                                // Currently there is only one feature -- 'SendTransaction'; 
 }
 
-type Feature = { name: 'SendTransaction', maxMessages: number } | // `maxMessages` is maximum number of messages in one `SendTransaction` that the wallet supports
-        { name: 'SignData' };
+type Feature =
+      | { name: 'SendTransaction'; maxMessages: number } // `maxMessages` is maximum number of messages in one `SendTransaction` that the wallet supports
+      | { name: 'SignData'; types: ('text' | 'binary' | 'cell')[] } // `types` is list of supported data types for `SignData` method
+      | { name: 'Subscription'; versions: 'v2'[] }; // `versions` is list of supported subscription versions for `CreateSubscription` and `CancelSubscription` methods (currently only 'v2' is supported)
 
 type ConnectItemReply = TonAddressItemReply | TonProofItemReply ...;
 
@@ -217,6 +218,8 @@ The signature must be verified by public key:
 - sendTransaction
 - signData
 - disconnect
+- createSubscriptionV2
+- cancelSubscriptionV2
 
 **Available events:**
 
@@ -548,6 +551,136 @@ If the data should be used in the TON Blockchain, use Cell format.
 If the data needs to be human-readable—but is not textual—use the **Cell** format. In this format, include a `schema` field that contains the TL-B schema of the payload. However, note that the Wallet is not required to display the content of the Cell.
 
 Otherwise, use Binary format.
+
+#### Subscriptions
+
+##### Create subscription (v2)
+
+App sends **CreateSubscriptionRequest**:
+
+```tsx
+interface CreateSubscriptionRequest {
+    method: 'createSubscriptionV2';
+    params: [<subscription-v2-payload>];
+    id: string;
+}
+```
+
+Where `<subscription-v2-payload>` is JSON with the following properties:
+
+- `subscription` - JSON object with the following properties:
+- `beneficiary` (string) — TON address that will receive subscription payments (raw `0:<hex>` or user‑friendly base64 format).
+- `subscriptionId` (string) — UUID assigned by the merchant.
+- `period` (integer) — billing period in **seconds**; **MUST** be a multiple of  
+  `604800` (7 days), `2592000` (30 days), `2629800` (calendar month) or  
+  `31557600` (1 calendar year).
+- `amount` (decimal string) — number of nanocoins that will be debited on each charge.
+- `firstChargingDate` (integer, optional) — UNIX timestamp (seconds) of the first charge. If omitted, the wallet charges immediately after confirmation.
+- `metadata` (object) — human-readable information about the plan:
+
+  - `logo` (string) — URL of the plan logo (PNG / SVG).
+  - `name` (string) — plan name.
+  - `description` (string) — plan description shown in the wallet.
+  - `link` (string) — public URL with detailed information.
+  - `tos` (string) — URL to Terms of Service.
+  - `merchant` (string) — merchant name shown in the wallet.
+  - `website` (string) — merchant website.
+
+  - `category` (string, optional) — category slug such as `"video"` or `"games"`.
+
+  
+  > **Network.** This request does **not** include a `network` field.  
+  > The wallet builds and broadcasts the transaction in the network  
+  > (mainnet / testnet) that is currently selected in the wallet UI.
+  
+
+Wallet replies with **CreateSubscriptionV2Response**:
+
+```tsx
+type CreateSubscriptionV2Response =
+    | CreateSubscriptionV2ResponseSuccess
+    | CreateSubscriptionV2ResponseError;
+
+interface CreateSubscriptionV2ResponseSuccess {
+    result: {
+        boc: string; // base64-encoded BoC of the created transaction for cancel subscription
+    },
+    id: string;
+}
+
+interface CreateSubscriptionV2ResponseError {
+    error: { code: number; message: string };
+    id: string;
+}
+```
+
+**Error codes**
+
+| code | description               |
+| ---- | ------------------------- |
+| 0    | Unknown error             |
+| 1    | Bad request               |
+| 100  | Unknown app               |
+| 300  | User declined the request |
+| 400  | Method not supported      |
+
+> **Wallet behaviour.** After user approval, the wallet **MUST**:
+> - Deploy the subscription-extension contract with the supplied parameters. TODO: add link to contract
+> - Add the deployed extension address to the wallet-contract’s allowed-plugins list.
+> - **MUST NOT** store unencrypted metadata on-chain. Metadata **MUST** be encrypted inside the wallet with a symmetric key derived locally. TODO: add link to encryption scheme (to be specified in a future revision)
+
+---
+
+##### Cancel subscription (v2)
+
+App sends **CancelSubscriptionV2Request**:
+
+```tsx
+interface CancelSubscriptionV2Request {
+    method: 'cancelSubscriptionV2';
+    params: [<cancel-subscription-v2-payload>];
+    id: string;
+}
+```
+
+Where `<cancel-subscription-v2-payload>` is JSON with the following properties:
+- `extensionAddress` (string) — address of the deployed subscription‑extension contract (raw `0:<hex>` or user‑friendly base64).
+
+Wallet replies with **CancelSubscriptionV2Response**:
+
+```tsx
+type CancelSubscriptionV2Response =
+    | CancelSubscriptionV2ResponseSuccess
+    | CancelSubscriptionV2ResponseError;
+
+interface CancelSubscriptionV2ResponseSuccess {
+    result: {
+        boc: string; // base64-encoded BoC of the created transaction for cancel subscription
+    },
+    id: string;
+}
+
+interface CancelSubscriptionV2ResponseError {
+    error: { code: number; message: string };
+    id: string;
+}
+```
+
+**Error codes**
+
+| code | description               |
+| ---- | ------------------------- |
+| 0    | Unknown error             |
+| 1    | Bad request               |
+| 100  | Unknown app               |
+| 300  | User declined the request |
+| 400  | Method not supported      |
+| 404  | Extension not found       |
+
+> **Wallet behaviour.** After user approval, the wallet **MUST**:
+> - Send a cancellation message to the subscription-extension contract.
+> - Remove the extension address from the wallet-contract’s allowed-plugins list.
+> - **MUST NOT** store unencrypted metadata on-chain. Metadata **MUST** be encrypted inside the wallet with a symmetric key derived locally. TODO: add link to encryption scheme (to be specified in a future revision)
 
 #### Disconnect operation
 When user disconnects the wallet in the dApp, dApp should inform the wallet to help the wallet save resources and delete unnecessary session.
