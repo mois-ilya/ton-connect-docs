@@ -624,6 +624,50 @@ interface CreateSubscriptionV2ResponseError {
 | 300  | User declined the request |
 | 400  | Method not supported      |
 
+<details>
+<summary>Example&nbsp;— request / success / error</summary>
+
+**Request**
+
+```json5
+{
+  "method": "createSubscriptionV2",
+  "params": [{
+    "beneficiary": "0:348bcf827469c5fc3854…",
+    "subscriptionId": "550e8400-e29b-41d4-a716-446655440000",
+    "period": 2592000,
+    "amount": "250000000",
+    "firstChargingDate": 1719907200,
+    "metadata": {
+      "name": "Pro plan",
+      "logo": "https://cdn.acme.com/subs/pro.png",
+      "merchant": "Acme Inc."
+    }
+  }],
+  "id": "42"
+}
+```
+
+**Success**
+
+```json5
+{
+  "result": { "boc": "te6ccgEBAQEAXwAA…" },
+  "id": "42"
+}
+```
+
+**Error (300 User declined)**
+
+```json5
+{
+  "error": { "code": 300, "message": "User declined the transaction" },
+  "id": "42"
+}
+```
+
+</details>
+
 > **Wallet behaviour.** After user approval, the wallet **MUST**:
 > - Deploy the subscription-extension contract with the supplied parameters. TODO: add link to contract
 > - Add the deployed extension address to the wallet-contract’s allowed-plugins list.
@@ -676,6 +720,38 @@ interface CancelSubscriptionV2ResponseError {
 | 300  | User declined the request |
 | 400  | Method not supported      |
 | 404  | Extension not found       |
+
+<details>
+<summary>Example&nbsp;— request / success / error</summary>
+
+**Request**
+
+```json5
+{
+  "method": "cancelSubscriptionV2",
+  "params": [{ "extensionAddress": "0:abcd…ef" }],
+  "id": "43"
+}
+````
+
+**Success**
+
+```json5
+{
+  "result": { "boc": "te6ccgEBAQEAKAAA…" },
+  "id": "43"
+}
+```
+
+**Error (404 Extension not found)**
+
+```json5
+{
+  "error": { "code": 404, "message": "Extension not found" },
+  "id": "43"
+}
+```
+</details>
 
 > **Wallet behaviour.** After user approval, the wallet **MUST**:
 > - Send a cancellation message to the subscription-extension contract.
