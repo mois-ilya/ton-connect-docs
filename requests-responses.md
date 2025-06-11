@@ -368,6 +368,7 @@ interface SendTransactionResponseError {
 | 300  | User declined the transaction |
 | 400  | Method not supported       |
 
+* Wallet MUST NOT allow signing a message whose destination is any wallet plugin via TonConnect (i.e., if the dApp requests the wallet to sign a message addressed to its plugin)
 
 #### Sign Data
 
