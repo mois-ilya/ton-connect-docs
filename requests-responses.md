@@ -309,9 +309,11 @@ Message structure:
 
 <details>
 <summary>Common cases</summary>
+
 1. No payload, no stateInit: simple transfer without a message.
 2. payload is prefixed with 32 zero bits, no stateInit: simple transfer with a text message.
 3. No payload or prefixed with 32 zero bits; stateInit is present: deployment of the contract.
+
 </details>
 
 <details>
@@ -557,10 +559,10 @@ Otherwise, use Binary format.
 
 ##### Create subscription (v2)
 
-App sends **CreateSubscriptionRequest**:
+App sends **CreateSubscriptionV2Request**:
 
 ```tsx
-interface CreateSubscriptionRequest {
+interface CreateSubscriptionV2Request {
     method: 'createSubscriptionV2';
     params: [<subscription-v2-payload>];
     id: string;
@@ -569,31 +571,57 @@ interface CreateSubscriptionRequest {
 
 Where `<subscription-v2-payload>` is JSON with the following properties:
 
-- `subscription` - JSON object with the following properties:
-- `beneficiary` (string) — TON address that will receive subscription payments (raw `0:<hex>` or user‑friendly base64 format).
-- `subscriptionId` (string) — UUID assigned by the merchant.
-- `period` (integer) — billing period in **seconds**; **MUST** be a multiple of  
-  `604800` (7 days), `2592000` (30 days), `2629800` (calendar month) or  
-  `31557600` (1 calendar year).
-- `amount` (decimal string) — number of nanocoins that will be debited on each charge.
-- `firstChargingDate` (integer, optional) — UNIX timestamp (seconds) of the first charge. If omitted, the wallet charges immediately after confirmation.
-- `metadata` (object) — human-readable information about the plan:
+* `valid_until` (integer, optional): UNIX timestamp. After this moment the transaction is invalid.
+* `network` (NETWORK, optional): The network (mainnet or testnet) where DApp intends to send the transaction. If not set, the transaction is sent to the network currently set in the wallet, but this is not safe and DApp should always strive to set the network. If the `network` parameter is set, but the wallet has a different network set, the wallet should show an alert and DO NOT ALLOW TO SEND this transaction.
+* `from` (string in <wc>:<hex> format, optional) - The sender address from which DApp intends to send the transaction. If not set, wallet allows user to select the sender's address at the moment of transaction approval. If `from` parameter is set, the wallet should DO NOT ALLOW user to select the sender's address; If sending from the specified address is impossible, the wallet should show an alert and DO NOT ALLOW TO SEND this transaction.
+* `subscription` (object): Subscription details (see **Subscription structure** below).
 
-  - `logo` (string) — URL of the plan logo (PNG / SVG).
-  - `name` (string) — plan name.
-  - `description` (string) — plan description shown in the wallet.
-  - `link` (string) — public URL with detailed information.
-  - `tos` (string) — URL to Terms of Service.
-  - `merchant` (string) — merchant name shown in the wallet.
-  - `website` (string) — merchant website.
+Subscription structure:
 
-  - `category` (string, optional) — category slug such as `"video"` or `"games"`.
+* `beneficiary` (string): TON address that receives the subscription payments (`0:<hex>` raw or user-friendly base64).
+* `id` (number): Subscription identifier. Set by the initiator of the subscription. This field, together with beneficiary and from, forms a quasi-unique key identifying the subscription and is used to derive the initial state of the subscription extension. Can be reused to update an existing subscription
+* `period` (integer): Billing period in **seconds**; **MUST** be a multiple of `604800` (7 days), `2592000` (30 days), `2629800` (calendar month), or `31557600` (calendar year).
+* `amount` (decimal string): Number of nanocoins debited on each charge.
+* `first_charge_date` (integer, optional): UNIX timestamp (seconds) of the first charge. If omitted, the wallet charges immediately after user confirmation.
+* `metadata` (object, optional): Human-readable information about the plan:
 
-  
-  > **Network.** This request does **not** include a `network` field.  
-  > The wallet builds and broadcasts the transaction in the network  
-  > (mainnet / testnet) that is currently selected in the wallet UI.
-  
+  * `logo` (string): URL of the plan’s PNG/SVG logo.
+  * `name` (string): Plan name.
+  * `description` (string): Description shown in the wallet.
+  * `link` (string): Public URL with detailed information.
+  * `tos` (string): Terms-of-Service URL.
+  * `merchant` (string): Merchant name shown in the wallet.
+  * `website` (string): Merchant website.
+  * `category` (string, optional): Category slug such as `"video"` or `"games"`.
+
+<details>
+<summary>Example — request payload</summary>
+
+```json5
+{
+  "valid_until": 1721011200,
+  "network": "-239", // enum NETWORK { MAINNET = '-239', TESTNET = '-3'}
+  "from": "0:348bcf827469c5fc38541c77fdd91d4e347eac200f6f2d9fd62dc08885f0415f",
+  "subscription": {
+    "beneficiary": "EQApwowlR6X54bXoso6orKCzCNm9ily8pAFy5vTwmsQ2Wqin",
+    "id": 1,
+    "period": 1209600, // once every 14 days
+    "amount": "60000000",
+    "first_charge_date": 1754006400, 
+    "metadata": {
+      "logo": "https://myapp.com/logo.png",
+      "name": "Pro Plan",
+      "description": "Access to all premium features.",
+      "link": "https://myapp.com/plan-details",
+      "tos": "https://myapp.com/terms",
+      "merchant": "Example Service",
+      "website": "https://myapp.com",
+      "category": "productivity"
+    }
+  }
+}
+```
+</details>
 
 Wallet replies with **CreateSubscriptionV2Response**:
 
@@ -604,7 +632,7 @@ type CreateSubscriptionV2Response =
 
 interface CreateSubscriptionV2ResponseSuccess {
     result: {
-        boc: string; // base64-encoded BoC of the created transaction for cancel subscription
+        boc: string; // base64-encoded BoC of the created transaction for create subscription
     },
     id: string;
 }
@@ -626,28 +654,7 @@ interface CreateSubscriptionV2ResponseError {
 | 400  | Method not supported      |
 
 <details>
-<summary>Example&nbsp;— request / success / error</summary>
-
-**Request**
-
-```json5
-{
-  "method": "createSubscriptionV2",
-  "params": [{
-    "beneficiary": "0:348bcf827469c5fc3854…",
-    "subscriptionId": "550e8400-e29b-41d4-a716-446655440000",
-    "period": 2592000,
-    "amount": "250000000",
-    "firstChargingDate": 1719907200,
-    "metadata": {
-      "name": "Pro plan",
-      "logo": "https://cdn.acme.com/subs/pro.png",
-      "merchant": "Acme Inc."
-    }
-  }],
-  "id": "42"
-}
-```
+<summary>Example&nbsp;— success / error</summary>
 
 **Success**
 
@@ -666,7 +673,6 @@ interface CreateSubscriptionV2ResponseError {
   "id": "42"
 }
 ```
-
 </details>
 
 > **Wallet behaviour.** After user approval, the wallet **MUST**:
@@ -689,6 +695,10 @@ interface CancelSubscriptionV2Request {
 ```
 
 Where `<cancel-subscription-v2-payload>` is JSON with the following properties:
+
+* `valid_until` (integer, optional): UNIX timestamp. After this moment the transaction is invalid.
+* `network` (NETWORK, optional): The network (mainnet or testnet) where DApp intends to send the transaction. If not set, the transaction is sent to the network currently set in the wallet, but this is not safe and DApp should always strive to set the network. If the `network` parameter is set, but the wallet has a different network set, the wallet should show an alert and DO NOT ALLOW TO SEND this transaction.
+* `from` (string in <wc>:<hex> format, optional) - The sender address from which DApp intends to send the transaction. If not set, wallet allows user to select the sender's address at the moment of transaction approval. If `from` parameter is set, the wallet should DO NOT ALLOW user to select the sender's address; If sending from the specified address is impossible, the wallet should show an alert and DO NOT ALLOW TO SEND this transaction.
 - `extensionAddress` (string) — address of the deployed subscription‑extension contract (raw `0:<hex>` or user‑friendly base64).
 
 Wallet replies with **CancelSubscriptionV2Response**:
@@ -730,7 +740,12 @@ interface CancelSubscriptionV2ResponseError {
 ```json5
 {
   "method": "cancelSubscriptionV2",
-  "params": [{ "extensionAddress": "0:abcd…ef" }],
+  "params": [{
+    "valid_until": 1721011200,
+    "network": "-239", // enum NETWORK { MAINNET = '-239', TESTNET = '-3'}
+    "from": "0:348bcf827469c5fc38541c77fdd91d4e347eac200f6f2d9fd62dc08885f0415f",
+    "extensionAddress": "EQApwowlR6X54bXoso6orKCzCNm9ily8pAFy5vTwmsQ2Wqin"
+  }],
   "id": "43"
 }
 ````
