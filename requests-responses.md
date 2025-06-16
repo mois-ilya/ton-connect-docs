@@ -580,7 +580,7 @@ Subscription structure:
 
 * `beneficiary` (string): TON address that receives the subscription payments (`0:<hex>` raw or user-friendly base64).
 * `id` (number): Subscription identifier. Set by the initiator of the subscription. This field, together with beneficiary and from, forms a quasi-unique key identifying the subscription and is used to derive the initial state of the subscription extension. Can be reused to update an existing subscription
-* `period` (integer): Billing period in **seconds**; **MUST** be a multiple of `604800` (7 days), `2592000` (30 days), `2629800` (calendar month), or `31557600` (calendar year).
+* `period` (integer): Billing period in **seconds**; **MUST** be a multiple of `604800` (7 days), `2592000` (30 days), `2629800` (calendar month), or `31557600` (calendar year) and **MUST NOT be** `0`.
 * `amount` (decimal string): Number of nanocoins debited on each charge.
 * `first_charge_date` (integer, optional): UNIX timestamp (seconds) of the first charge. If omitted, the wallet charges immediately after user confirmation.
 * `metadata` (object, optional): Human-readable information about the plan:
