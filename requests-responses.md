@@ -89,9 +89,9 @@ type DeviceInfo = {
 }
 
 type Feature =
-      | { name: 'SendTransaction'; maxMessages: number } // `maxMessages` is maximum number of messages in one `SendTransaction` that the wallet supports
-      | { name: 'SignData'; types: ('text' | 'binary' | 'cell')[] } // `types` is list of supported data types for `SignData` method
-      | { name: 'Subscription'; versions: 'v2'[] }; // `versions` is list of supported subscription versions for `CreateSubscription` and `CancelSubscription` methods (currently only 'v2' is supported)
+      | { name: 'SendTransaction'; maxMessages: number } // `maxMessages` is the maximum number of messages in a single `SendTransaction` that the wallet supports
+      | { name: 'SignData'; types: ('text' | 'binary' | 'cell')[] } // `types` specifies the supported data types for the `SignData` method
+      | { name: 'Subscription'; versions: { v2: boolean } }; // `versions` indicates which subscription versions are supported for `CreateSubscription` and `CancelSubscription` methods (currently only 'v2' is supported)
 
 type ConnectItemReply = TonAddressItemReply | TonProofItemReply ...;
 
